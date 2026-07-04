@@ -62,9 +62,20 @@ terminal, no Node required.
    - **Linux** — `Flight-Radar-x.y.z.AppImage`. Mark it executable and run it.
 2. Launch it like any other app. The globe opens in its own window.
 
-> **First launch on macOS/Windows:** because the app is free and unsigned, your OS
-> may warn the first time. On macOS, **right-click the app → Open** (once). On
-> Windows, click **More info → Run anyway**. After that it opens normally.
+> **First launch (important):** because the app isn't notarized by Apple, your OS
+> warns you the first time. This is normal — the download is fine.
+>
+> - **macOS:** double-click the app once (it will be blocked), then open
+>   **System Settings → Privacy & Security**, scroll down, and click
+>   **“Open Anyway”** next to Flight-Radar. Confirm with **Open**. After that it
+>   launches normally.
+>   *If macOS instead says the app is “damaged,”* open **Terminal** and run:
+>   `xattr -cr /Applications/Flight-Radar.app` — then open it again.
+> - **Windows:** on the blue “Windows protected your PC” screen, click
+>   **More info → Run anyway**.
+>
+> Want a seamless, warning-free install? That requires a paid Apple Developer
+> account ($99/yr) for notarization on macOS — see the notes in the release.
 
 It still needs an internet connection — this is *live* flight/ship/satellite data.
 
