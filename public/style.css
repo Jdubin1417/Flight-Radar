@@ -207,11 +207,12 @@ html, body { margin: 0; height: 100%; background: #000; overflow: hidden;
 #extAccept:hover { filter: brightness(1.15); }
 
 #helpBtn {
-  display: block; width: 100%; margin-top: 8px; cursor: pointer;
-  background: rgba(255,255,255,.06); border: 1px solid rgba(120,160,220,.3);
-  color: #eaf2ff; border-radius: 9px; padding: 8px 12px; font-size: 13px;
+  display: inline-block; margin-top: 8px; margin-left: 8px;
+  pointer-events: auto; cursor: pointer;
+  background: rgba(10,16,28,.7); border: 1px solid rgba(120,160,220,.3);
+  color: #eaf2ff; border-radius: 999px; padding: 6px 14px; font-size: 13px;
 }
-#helpBtn:hover { background: rgba(255,255,255,.14); }
+#helpBtn:hover { filter: brightness(1.2); border-color: rgba(120,180,255,.6); }
 
 #welcomeOverlay {
   position: absolute; inset: 0; z-index: 40; display: flex;
