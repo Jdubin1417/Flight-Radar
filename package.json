@@ -1,0 +1,79 @@
+{
+  "name": "flight-radar",
+  "version": "1.0.0",
+  "description": "Local sea/sky/orbit tracker: ships (AIS), aircraft (ADS-B), and satellites on a 3D globe. All free data, no paid subscription.",
+  "type": "module",
+  "main": "electron/main.js",
+  "author": "Flight-Radar",
+  "scripts": {
+    "start": "node server.js",
+    "app": "electron .",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3",
+    "playwright": "^1.61.1"
+  },
+  "build": {
+    "appId": "com.flightradar.desktop",
+    "productName": "Flight-Radar",
+    "copyright": "Flight-Radar",
+    "asar": true,
+    "asarUnpack": [
+      "public/**/*"
+    ],
+    "files": [
+      "electron/**/*",
+      "server.js",
+      "public/**/*",
+      "!**/*.map",
+      "!_*.mjs"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.png",
+      "identity": null
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "category": "Utility",
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png"
+    }
+  }
+}

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flight-Radar · Sea · Sky · Orbit</title>
+
+  <!-- Cesium: free 3D globe. Set base URL so its web workers/assets load. -->
+  <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/';</script>
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+
+  <!-- satellite.js: propagate TLEs to live positions in the browser -->
+  <script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+
+  <div id="hud">
+    <div id="brand">🌍 Flight-Radar</div>
+    <button id="resetViewBtn" title="Return to the home camera view">↺ Reset view</button>
+    <div class="ctl-row">
+      <span class="ctl-label">Show</span>
+      <button class="layer-toggle" data-layer="sats">🛰️ <b id="cSats">0</b></button>
+      <button class="layer-toggle" data-layer="planes">✈️ <b id="cPlanes">0</b></button>
+      <button class="layer-toggle" data-layer="ships">🚢 <b id="cShips">0</b></button>
+    </div>
+    <div class="ctl-row">
+      <span class="ctl-label">Trails</span>
+      <button class="trail-toggle" data-trail="sats">🛰️</button>
+      <button class="trail-toggle" data-trail="planes">✈️</button>
+      <button class="trail-toggle" data-trail="ships">🚢</button>
+    </div>
+    <div class="ctl-row">
+      <span class="ctl-label">Map</span>
+      <select id="baseMapSel" class="map-select" title="Base map">
+        <option value="imagery" selected>🛰 Satellite</option>
+        <option value="streets">🗺 Streets</option>
+        <option value="topo">⛰ Terrain</option>
+        <option value="natgeo">🌍 Atlas</option>
+        <option value="live">🌥 Live clouds</option>
+      </select>
+      <button id="labelsToggle" class="map-toggle">🏷️ Labels</button>
+      <button id="weatherToggle" class="map-toggle off" title="Precipitation radar — only where ground radar exists">🌧️ Radar</button>
+      <button id="rainToggle" class="map-toggle off" title="Modeled global rain (OpenWeatherMap — free key)">🌦️ Rain</button>
+      <button id="extToggle" class="map-toggle off" title="Extra flights from a third-party feed (experimental) — reaches open ocean &amp; remote areas">🌐 Extended</button>
+    </div>
+    <div id="mapMsg" class="hidden"></div>
+    <div class="ctl-row">
+      <span class="ctl-label">Find</span>
+      <input id="search" type="text" autocomplete="off" spellcheck="false"
+        placeholder="callsign, type, airline, country, satellite…" />
+      <button id="searchClear" title="clear">✕</button>
+    </div>
+    <div id="hint">Click a plane for details · type above to filter the fleet</div>
+    <div id="aisWarn" class="hidden">🚢 Sea view is off — click <b>⚙️ Settings</b> to add a free aisstream.io key</div>
+    <button id="settingsBtn" title="API keys &amp; settings">⚙️ Settings</button>
+    <button id="helpBtn" title="Show the welcome guide">❔ Guide</button>
+  </div>
+
+  <div id="camCtl">
+    <button id="camIn" title="Zoom in">＋</button>
+    <button id="camOut" title="Zoom out">－</button>
+    <button id="camNorth" title="Face north, look straight down">🧭</button>
+    <button id="camHome" title="Reset to home view">⌂</button>
+  </div>
+
+  <div id="tooltip" class="hidden"></div>
+
+  <div id="panel" class="hidden">
+    <button id="panelClose" title="close">✕</button>
+    <div id="panelBody"></div>
+  </div>
+
+  <div id="settingsOverlay" class="hidden">
+    <div id="settings">
+      <button id="settingsClose" title="close">✕</button>
+      <h2>⚙️ Settings</h2>
+      <p class="s-intro">Add free API keys to unlock more data. Keys are saved on
+        your own computer and applied instantly — no restart needed.</p>
+
+      <div class="s-group">
+        <label for="setAis">🚢 Ships (AIS) — <span class="s-status" id="setAisStatus">not set</span></label>
+        <p class="s-help">Get a free key at
+          <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>
+          (sign up → create an API key).</p>
+        <input id="setAis" type="password" autocomplete="off" spellcheck="false"
+          placeholder="AISSTREAM_API_KEY" />
+      </div>
+
+      <div class="s-group">
+        <label>✈️ Aircraft (OpenSky) — <span class="s-status" id="setOskyStatus">anonymous</span></label>
+        <p class="s-help">Optional. Anonymous works but is rate-limited. A free
+          account at
+          <a href="https://opensky-network.org" target="_blank" rel="noopener">opensky-network.org</a>
+          (Account → API clients) raises the limit ~10×.</p>
+        <input id="setOskyId" type="text" autocomplete="off" spellcheck="false"
+          placeholder="OPENSKY_CLIENT_ID" />
+        <input id="setOskySecret" type="password" autocomplete="off" spellcheck="false"
+          placeholder="OPENSKY_CLIENT_SECRET" />
+        <div id="oskyDropzone" class="s-dropzone" role="button" tabindex="0"
+          aria-label="Load OpenSky credentials JSON">
+          <b>Drag your OpenSky credentials .json here</b>
+          <span>or click to browse — then click Save</span>
+        </div>
+        <input id="oskyFile" class="hidden-file" type="file" accept="application/json,.json" />
+      </div>
+
+      <div class="s-group">
+        <label for="setOwm">🌦️ Global rain (OpenWeatherMap) — <span class="s-status" id="setOwmStatus">not set</span></label>
+        <p class="s-help">Optional. Enables the <b>🌦️ Rain</b> map overlay — modeled
+          precipitation covering the whole world (radar only covers some regions).
+          Free key at
+          <a href="https://home.openweathermap.org/api_keys" target="_blank" rel="noopener">openweathermap.org</a>
+          (sign up → API keys).</p>
+        <input id="setOwm" type="password" autocomplete="off" spellcheck="false"
+          placeholder="OWM_API_KEY" />
+      </div>
+
+      <div class="s-actions">
+        <span id="setMsg"></span>
+        <button id="settingsSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="extOverlay" class="hidden">
+    <div id="extModal">
+      <h2>🌐 Enable the Extended feed?</h2>
+      <p class="ext-body">
+        This adds extra aircraft from <b>FlightRadar24</b>, a third-party service.
+        Because FR24 also aggregates <b>satellite-based</b> ADS-B, it can show
+        flights over the <b>open ocean</b> and other remote areas that the free
+        ground-receiver networks (OpenSky, adsb.lol, airplanes.live) physically
+        can't see.
+      </p>
+      <ul class="ext-body ext-list">
+        <li>It uses an <b>unofficial</b> endpoint — there is no public API or key.</li>
+        <li>It may be <b>rate-limited or stop working</b> at any time without notice.</li>
+        <li>Use it for <b>personal, non-commercial</b> viewing only, and respect
+          FlightRadar24's terms of service.</li>
+      </ul>
+      <p class="ext-body ext-note">Everything else in the app keeps working if this
+        feed is off or unavailable. You can turn it off anytime with the
+        <b>🌐 Extended</b> button.</p>
+      <div class="ext-actions">
+        <button id="extCancel">Cancel</button>
+        <button id="extAccept">I understand — enable</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="welcomeOverlay" class="hidden">
+    <div id="welcomeModal">
+      <button id="welcomeClose" title="close">✕</button>
+      <h2>🌍 Welcome to Flight-Radar</h2>
+      <p class="w-intro">Live <b>sea, sky &amp; orbit</b> on a 3D globe — every ship,
+        plane and satellite you see is pulled from <b>free public data</b>. No paid
+        subscription, no USB stick.</p>
+
+      <h3 class="w-h">Where the data comes from</h3>
+      <ul class="w-sources">
+        <li><span class="w-ico">🛰️</span><div><b>Satellites</b> — live orbits from
+          Celestrak (ISS, Starlink, GPS…). <i>No key needed.</i></div></li>
+        <li><span class="w-ico">✈️</span><div><b>Aircraft</b> — ADS-B from OpenSky
+          plus community receivers (adsb.lol, airplanes.live). <i>Works with no key;
+          a free OpenSky account raises the limits.</i></div></li>
+        <li><span class="w-ico">🚢</span><div><b>Ships</b> — live AIS from aisstream.io.
+          <i>Needs a free key (add it in Settings).</i></div></li>
+        <li><span class="w-ico">🌐</span><div><b>Extended flights</b> — optional
+          third-party feed (FlightRadar24) that also carries <b>satellite ADS-B</b>,
+          so it can show planes over the <b>open ocean</b>. <i>Experimental.</i></div></li>
+      </ul>
+
+      <h3 class="w-h">The controls (top-left)</h3>
+      <ul class="w-controls">
+        <li><b>Show</b> 🛰️ ✈️ 🚢 — turn each layer on/off. The numbers are live counts.</li>
+        <li><b>Trails</b> 🛰️ ✈️ 🚢 — draw each object's recent path. (Click one object
+          for its full flight/orbit path.)</li>
+        <li><b>Map</b> — pick a base map (Satellite, Streets, Terrain, Atlas, Live
+          clouds), toggle 🏷️ <b>Labels</b>, and add weather: 🌧️ <b>Radar</b> (real
+          ground radar) or 🌦️ <b>Rain</b> (modeled, whole-world — needs a free key).
+          🌐 <b>Extended</b> adds the ocean-reaching third-party flights
+          (<b>shown in green</b>).</li>
+        <li><b>Find</b> — filter everything by callsign, type, airline, country, or
+          satellite. Try typing <b>iss</b>.</li>
+        <li><b>Click</b> any plane, ship or satellite for a full detail panel.</li>
+        <li><b>Camera</b> (bottom-right) — ＋/－ zoom, 🧭 face north, ⌂ home view.</li>
+      </ul>
+
+      <p class="w-settings">🔑 <b>Add free keys in ⚙️ Settings</b> to unlock ships and
+        global rain. Keys are stored only on your computer and applied instantly.</p>
+
+      <div class="w-actions">
+        <button id="welcomeSettings">⚙️ Open Settings</button>
+        <button id="welcomeStart">Start exploring →</button>
+      </div>
+      <p class="w-foot">You can reopen this guide anytime with the <b>❔ Guide</b> button.</p>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
